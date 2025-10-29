@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from typing import Any, Dict
+from uuid import uuid4
 
 
 def create_user(client, manager_headers, **overrides) -> Dict[str, Any]:
@@ -11,8 +12,9 @@ def create_user(client, manager_headers, **overrides) -> Dict[str, Any]:
 
     payload = {
         "name": "Jane Manager",
-        "email": "jane.manager@example.com",
+        "email": f"user-{uuid4().hex}@example.com",
         "role": "manager",
+        "password": "Password123!",
     }
     payload.update(overrides)
 

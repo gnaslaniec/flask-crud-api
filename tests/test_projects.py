@@ -4,20 +4,20 @@ from __future__ import annotations
 
 import json
 
-from .utils import create_project, create_task, create_user
+from app.models import Task
+
+from .utils import create_project, create_task
 
 
 def test_manager_can_create_project(client, manager_headers):
     """Managers can create projects."""
 
-    owner = create_user(client, manager_headers)
     response = client.post(
         "/projects",
         data=json.dumps(
             {
                 "name": "Project X",
                 "description": "Build something great.",
-                "created_by": owner["id"],
             }
         ),
         headers=manager_headers,
@@ -25,7 +25,7 @@ def test_manager_can_create_project(client, manager_headers):
     assert response.status_code == 201
     data = response.get_json()["data"]
     assert data["name"] == "Project X"
-    assert data["created_by"] == owner["id"]
+    assert data["created_by"] is not None
 
 
 def test_employee_cannot_create_project(client, employee_headers):
@@ -52,7 +52,7 @@ def test_update_project(client, manager_headers):
     assert response.get_json()["data"]["description"] == "Updated"
 
 
-def test_delete_project_removes_tasks(client, manager_headers):
+def test_delete_project_removes_tasks(client, manager_headers, employee_headers):
     """Deleting a project cascades to its tasks."""
 
     project = create_project(client, manager_headers)
@@ -63,17 +63,22 @@ def test_delete_project_removes_tasks(client, manager_headers):
     )
     assert delete_response.status_code == 200
 
-    tasks_response = client.get(f"/projects/{project['id']}/tasks")
+    tasks_response = client.get(
+        f"/projects/{project['id']}/tasks", headers=employee_headers
+    )
     assert tasks_response.status_code == 404
 
+    with client.application.app_context():
+        assert Task.query.filter_by(project_id=project["id"]).count() == 0
 
-def test_list_projects(client, manager_headers):
+
+def test_list_projects(client, manager_headers, employee_headers):
     """Listing projects returns created projects."""
 
     create_project(client, manager_headers, name="Project A")
     create_project(client, manager_headers, name="Project B")
 
-    response = client.get("/projects")
+    response = client.get("/projects", headers=employee_headers)
     assert response.status_code == 200
     names = [project["name"] for project in response.get_json()["data"]]
     assert "Project A" in names and "Project B" in names

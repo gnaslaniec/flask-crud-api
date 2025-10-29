@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 import os
 import sys
-from typing import Dict
+from base64 import b64encode
+from typing import Callable, Dict
 
 import pytest
 
@@ -14,6 +15,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from app import create_app
 from app.config import TestingConfig
 from app.extensions import db
+from app.models import User
 
 
 @pytest.fixture
@@ -37,17 +39,78 @@ def client(app):
 
 
 @pytest.fixture
-def manager_headers() -> Dict[str, str]:
-    """Headers representing an authorised manager user."""
+def create_user_record(app) -> Callable[..., User]:
+    """Factory for creating users directly in the database."""
 
-    return {"X-User-Role": "manager", "Content-Type": "application/json"}
+    def _create_user(
+        *,
+        name: str,
+        email: str,
+        role: str,
+        password: str = "Password123!",
+    ) -> User:
+        with app.app_context():
+            user = User(name=name, email=email, role=role)
+            user.set_password(password)
+            db.session.add(user)
+            db.session.commit()
+            db.session.refresh(user)
+            db.session.expunge(user)
+            return user
+
+    return _create_user
 
 
 @pytest.fixture
-def employee_headers() -> Dict[str, str]:
+def manager_headers(client, create_user_record) -> Dict[str, str]:
+    """Headers representing an authorised manager user."""
+
+    password = "ManagerPass123!"
+    user = create_user_record(
+        name="Jane Manager",
+        email="jane.manager@example.com",
+        role="manager",
+        password=password,
+    )
+
+    basic_token = b64encode(f"{user.email}:{password}".encode()).decode()
+    response = client.post(
+        "/auth/login",
+        headers={"Authorization": f"Basic {basic_token}"},
+    )
+    assert response.status_code == 200, response.get_json()
+    access_token = response.get_json()["access_token"]
+
+    return {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
+
+
+@pytest.fixture
+def employee_headers(client, create_user_record) -> Dict[str, str]:
     """Headers representing a non-privileged employee user."""
 
-    return {"X-User-Role": "employee", "Content-Type": "application/json"}
+    password = "EmployeePass123!"
+    user = create_user_record(
+        name="Eddie Employee",
+        email="eddie.employee@example.com",
+        role="employee",
+        password=password,
+    )
+
+    basic_token = b64encode(f"{user.email}:{password}".encode()).decode()
+    response = client.post(
+        "/auth/login",
+        headers={"Authorization": f"Basic {basic_token}"},
+    )
+    assert response.status_code == 200, response.get_json()
+    access_token = response.get_json()["access_token"]
+
+    return {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
 
 
 @pytest.fixture
