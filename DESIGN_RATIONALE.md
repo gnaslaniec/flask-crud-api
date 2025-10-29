@@ -4,7 +4,7 @@
 
 - **Application Factory**: The Flask app is created via `create_app` (`app/__init__.py`), enabling configuration overrides for testing and future environments.
 - **Extensions Module**: A single `SQLAlchemy` instance is initialised in `app/extensions.py` and imported wherever models need it, centralising ORM configuration.
-- **Blueprint Routing**: All HTTP routes live in `app/routes.py` under one blueprint, making it straightforward to extend or version the API later.
+- **Blueprint Routing**: HTTP routes are grouped into modules under `app/routes/`, all registering on a shared blueprint for clean separation by resource (auth, users, projects, tasks).
 
 ## Data Model Choices
 
@@ -20,8 +20,8 @@
 
 ## Authorisation Approach
 
-- The requirement specifies two user roles and manager-only write access. Rather than introduce full authentication, a lightweight header guard (`X-User-Role`) was chosen, implemented in `app/auth.py`.
-- A decorator (`require_manager`) keeps write permissions self-documenting on each route and can later be swapped out for real authentication middleware.
+- Manager-only write access drives the need for authentication. A dedicated login endpoint exchanges Basic credentials for short-lived JWTs, keeping the system stateless and compatible with HTTP clients.
+- The `require_manager` decorator validates bearer tokens, retrieves the associated user, and enforces the manager role while exposing `g.current_user` to route handlers.
 
 ## Testing Strategy
 

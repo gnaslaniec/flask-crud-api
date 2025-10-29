@@ -32,8 +32,9 @@ Key fixtures are defined in ``tests/conftest.py``:
 
 ``client`` – Offers a Flask ``test_client`` for issuing HTTP requests.
 
-``manager_headers`` / ``employee_headers`` – Convenience dictionaries with the
-appropriate ``X-User-Role`` header for RBAC checks.
+``manager_headers`` / ``employee_headers`` – Convenience dictionaries holding
+``Authorization: Bearer <token>`` headers. Tokens are obtained by logging in via
+the ``/auth/login`` endpoint inside the fixture setup.
 
 ``json_dumps`` – Wrapper around ``json.dumps`` to simplify payload generation.
 

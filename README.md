@@ -5,7 +5,7 @@ This repository contains a small but complete Project Management REST API built 
 ## Features
 
 - CRUD endpoints for users, projects, and nested project tasks
-- Role guard that requires managers (`X-User-Role: manager`) for all mutating operations
+- JWT-backed authentication with manager-only write permissions
 - SQLAlchemy data models with relationships and cascading deletes
 - Input validation and structured JSON error responses
 - Comprehensive pytest suite with reusable fixtures and factories
@@ -36,6 +36,12 @@ flask --app run.py init-db
 
 You can point to a different database by setting `DATABASE_URL`.
 
+If no users exist yet, this command seeds a default manager using the credentials
+configured via `DEFAULT_ADMIN_EMAIL` and `DEFAULT_ADMIN_PASSWORD` (defaults:
+`admin@admin.com` / `admin`). Update those environment variables before
+running the command if you want to set your own secure values. You can then call
+`/auth/login` with those credentials to obtain a token.
+
 ### Running the Server
 
 ```bash
@@ -46,15 +52,31 @@ The API will be available at `http://127.0.0.1:5000/`.
 
 ## API Usage
 
-Role-based access is enforced through the `X-User-Role` header:
+Authentication uses short-lived JWTs. Obtain a token via Basic authentication:
 
-- Use `X-User-Role: manager` for create/update/delete requests.
-- Omit the header or set `X-User-Role: employee` for read-only access.
+```bash
+curl -X POST \
+  -u manager@example.com:SuperSecret123 \
+  http://127.0.0.1:5000/auth/login
+```
+
+The response contains an `access_token`. Include it in subsequent requests:
+
+```
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
+
+All endpoints require a valid bearer token. Any authenticated user can perform
+read operations, while only managers can invoke mutating endpoints. Create users
+by supplying a `password` field; passwords are stored as hashes and never
+returned by the API.
 
 Key endpoints:
 
 | Resource  | Method & Path             | Description                    |
 |-----------|---------------------------|--------------------------------|
+| Auth      | `POST /auth/login`        | Exchange Basic credentials for a JWT |
 | Users     | `POST /users`             | Create a user (manager only)   |
 |           | `GET /users`              | List users                     |
 |           | `GET /users/<id>`         | Retrieve a user                |
@@ -67,8 +89,13 @@ Key endpoints:
 |           | `DELETE /projects/<id>`   | Delete a project (manager only)|
 | Tasks     | `POST /projects/<id>/tasks` | Create a task (manager only) |
 |           | `GET /projects/<id>/tasks`  | List project tasks            |
+|           | `PUT /projects/<id>/tasks/<task_id>` | Update a task (manager only) |
 
-Refer to in-code docstrings (`app/routes.py`) for detailed parameter and response information.
+Projects automatically record the authenticated manager as their creator; any
+payload `created_by` value is ignored. Deleting a project removes all of its
+tasks thanks to cascading deletes.
+
+Refer to in-code docstrings under `app/routes/` for detailed parameter and response information.
 
 ## Running Tests
 
@@ -78,31 +105,9 @@ pytest
 
 The tests use an in-memory SQLite database and cover CRUD happy paths, authorisation failures, and validation edge cases.
 
-## Repository Layout
-
-```
-app/
-  __init__.py        # App factory, error handlers, CLI hooks
-  config.py          # Runtime configuration classes
-  extensions.py      # SQLAlchemy instance
-  models.py          # ORM models and relationships
-  routes.py          # Flask routes and business logic
-  schemas.py         # Marshmallow schemas for validation/serialisation
-tests/
-  conftest.py        # Pytest fixtures
-  test_users.py      # User endpoint tests
-  test_projects.py   # Project endpoint tests
-  test_tasks.py      # Task endpoint tests
-  utils.py           # Shared API factory helpers
-run.py               # Flask entrypoint
-requirements.txt     # Python dependencies
-README.md            # This file
-DESIGN_RATIONALE.md  # Architectural decisions
-```
-
 ## Documentation
 
-Endpoints, parameters, and return types are described with Sphinx-style docstrings throughout `app/routes.py`. Full HTML documentation can be generated with Sphinx:
+Endpoints, parameters, and return types are described with Sphinx-style docstrings throughout the modules in `app/routes/`. Full HTML documentation can be generated with Sphinx:
 
 ```bash
 pip install -r requirements.txt  # if not already installed

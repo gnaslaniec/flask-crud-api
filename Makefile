@@ -7,9 +7,13 @@ SPHINXBUILD ?= sphinx-build
 SPHINXOPTS ?=
 DOCSSRC ?= docs
 DOCSBUILD ?= docs/_build
+SOURCE ?= source
 
 install:
 	$(PYTHON) -m pip install -r requirements.txt
+
+venv:
+	$(PYTHON) -m venv venv
 
 test:
 	pytest
