@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import CheckConstraint
 from sqlalchemy.orm import validates
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from .extensions import db
 
@@ -37,6 +38,7 @@ class User(TimestampMixin, db.Model):
     name = db.Column(db.String(120), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     role = db.Column(db.String(20), nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
 
     created_projects = db.relationship(
         "Project",
@@ -62,6 +64,16 @@ class User(TimestampMixin, db.Model):
         if value not in {"manager", "employee"}:
             raise ValueError("role must be either 'manager' or 'employee'")
         return value
+
+    def set_password(self, password: str) -> None:
+        """Hash and store the user's password."""
+
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password: str) -> bool:
+        """Verify a plaintext password against the stored hash."""
+
+        return check_password_hash(self.password_hash, password)
 
     def __repr__(self) -> str:
         return f"<User {self.id} {self.email}>"
@@ -99,8 +111,9 @@ class TaskStatus:
     TODO = "todo"
     IN_PROGRESS = "in_progress"
     DONE = "done"
+    CANCELED = "canceled"
 
-    ALL = (TODO, IN_PROGRESS, DONE)
+    ALL = (TODO, IN_PROGRESS, DONE, CANCELED)
 
 
 class Task(TimestampMixin, db.Model):
