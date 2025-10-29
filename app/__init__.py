@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional, Type
 
-from flask import Flask, Response, jsonify
+from flask import Flask
 
 from .config import Config
+from .errors import register_error_handlers
 from .extensions import db
 from .routes import api_bp
 
@@ -40,18 +41,6 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(api_bp)
 
 
-def register_error_handlers(app: Flask) -> None:
-    """Configure JSON error responses."""
-
-    @app.errorhandler(404)
-    def handle_not_found(error) -> Response:  # pragma: no cover - simple handler
-        return jsonify({"error": "not_found", "message": "Resource not found."}), 404
-
-    @app.errorhandler(400)
-    def handle_bad_request(error) -> Response:  # pragma: no cover - simple handler
-        return jsonify({"error": "bad_request", "message": "Bad request."}), 400
-
-
 def register_cli(app: Flask) -> None:
     """Set up helpful Flask CLI commands."""
 
@@ -60,4 +49,22 @@ def register_cli(app: Flask) -> None:
         """Initialise the database tables."""
 
         db.create_all()
-        print("Database initialised.")
+
+        from .models import User
+
+        admin_exists = db.session.query(User.id).first() is not None
+        if not admin_exists:
+            admin = User(
+                name=app.config["DEFAULT_ADMIN_NAME"],
+                email=app.config["DEFAULT_ADMIN_EMAIL"],
+                role="manager",
+            )
+            admin.set_password(app.config["DEFAULT_ADMIN_PASSWORD"])
+            db.session.add(admin)
+            db.session.commit()
+            print(
+                "Database initialised. "
+                f"Default admin '{admin.email}' created with manager role."
+            )
+        else:
+            print("Database initialised.")
