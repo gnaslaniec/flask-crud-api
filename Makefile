@@ -1,19 +1,18 @@
-.PHONY: install test test-cov run init-db clean docs docs-clean
+.PHONY: install venv test test-cov run db-init db-migrate db-upgrade db-downgrade init-admin clean docs docs-clean
 
 PYTHON ?= python3
-FLASK_APP ?= run.py
+FLASK_APP ?= app:create_app
 FLASK ?= flask
 SPHINXBUILD ?= sphinx-build
 SPHINXOPTS ?=
 DOCSSRC ?= docs
 DOCSBUILD ?= docs/_build
-SOURCE ?= source
 
 install:
 	$(PYTHON) -m pip install -r requirements.txt
 
 venv:
-	$(PYTHON) -m venv venv
+	$(PYTHON) -m venv .venv
 
 test:
 	pytest
@@ -24,8 +23,20 @@ test-cov:
 run:
 	$(FLASK) --app $(FLASK_APP) run
 
-init-db:
-	$(FLASK) --app $(FLASK_APP) init-db
+db-init:
+	$(FLASK) --app $(FLASK_APP) db init
+
+db-migrate:
+	$(FLASK) --app $(FLASK_APP) db migrate -m "$(m)"
+
+db-upgrade:
+	$(FLASK) --app $(FLASK_APP) db upgrade
+
+db-downgrade:
+	$(FLASK) --app $(FLASK_APP) db downgrade
+
+init-admin:
+	$(FLASK) --app $(FLASK_APP) init-admin
 
 clean:
 	find . -type d -name "__pycache__" -prune -exec rm -rf {} \; -o -type f -name "*.pyc" -delete
