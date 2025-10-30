@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from sqlalchemy import CheckConstraint
 from sqlalchemy.orm import validates
 
 from ..extensions import db

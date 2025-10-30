@@ -6,7 +6,7 @@ from flask import Response, g, request
 
 from ..auth import require_auth, require_manager
 from ..extensions import db
-from ..models import Project, User
+from ..models import Project
 from ..schemas import ProjectSchema
 from . import api_bp
 from .common import get_or_404, json_response

@@ -1,6 +1,6 @@
 # Flask Project Management API
 
-This repository contains a small but complete Project Management REST API built with Flask, SQLAlchemy, and Marshmallow. It exposes CRUD endpoints for users, projects, and tasks, enforces simple role-based access control, and includes pytest-based unit tests and documentation.
+This repository contains a complete Project Management REST API built with Flask, SQLAlchemy, Marshmallow and Alembic. It exposes CRUD endpoints for users, projects, and tasks, enforces simple role-based access control, and includes pytest-based unit tests and documentation.
 
 ## Features
 
@@ -201,7 +201,7 @@ Open `docs/_build/html/index.html` in your browser to explore the rendered docs.
 
 ## Postman Collection
 
-A Postman collection (`docs/postman_collection.json`) is included for quickly exercising the API endpoints in a collaborative environment.
+A Postman collection (`docs/Project Management API.postman_collection.json`) is included for quickly exercising the API endpoints in a collaborative environment.
 
 ## Design Rationale
 
