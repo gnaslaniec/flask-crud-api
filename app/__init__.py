@@ -5,10 +5,12 @@ from __future__ import annotations
 from typing import Any, Dict, Optional, Type
 
 from flask import Flask
+from flask.cli import with_appcontext
 
 from .config import Config
 from .errors import register_error_handlers
-from .extensions import db
+from .extensions import db, migrate
+from .models import User
 from .routes import api_bp
 
 
@@ -20,6 +22,9 @@ def create_app(config_object: Optional[Type[Config] | Dict[str, Any]] = None) ->
 
     if config_object:
         app.config.from_object(config_object)
+
+    app.config.setdefault("ENV", getattr(app, "env", "production"))
+    app.logger.info(f"Starting Flask app [{app.config['ENV']}]")
 
     register_extensions(app)
     register_blueprints(app)
@@ -33,6 +38,7 @@ def register_extensions(app: Flask) -> None:
     """Attach extensions to the app."""
 
     db.init_app(app)
+    migrate.init_app(app, db)
 
 
 def register_blueprints(app: Flask) -> None:
@@ -42,29 +48,27 @@ def register_blueprints(app: Flask) -> None:
 
 
 def register_cli(app: Flask) -> None:
-    """Set up helpful Flask CLI commands."""
+    """Register custom Flask CLI commands."""
 
-    @app.cli.command("init-db")
-    def init_db() -> None:  # pragma: no cover - CLI utility
-        """Initialise the database tables."""
-
-        db.create_all()
-
-        from .models import User
+    @app.cli.command("init-admin")
+    @with_appcontext
+    def init_admin() -> None:  # pragma: no cover - CLI utility
+        """Ensure a default admin user exists."""
 
         admin_exists = db.session.query(User.id).first() is not None
-        if not admin_exists:
-            admin = User(
-                name=app.config["DEFAULT_ADMIN_NAME"],
-                email=app.config["DEFAULT_ADMIN_EMAIL"],
-                role="manager",
-            )
-            admin.set_password(app.config["DEFAULT_ADMIN_PASSWORD"])
-            db.session.add(admin)
-            db.session.commit()
-            print(
-                "Database initialised. "
-                f"Default admin '{admin.email}' created with manager role."
-            )
-        else:
-            print("Database initialised.")
+        if admin_exists:
+            print("Default admin already exists.")
+            return
+
+        admin = User(
+            name=app.config["DEFAULT_ADMIN_NAME"],
+            email=app.config["DEFAULT_ADMIN_EMAIL"],
+            role="manager",
+        )
+        admin.set_password(app.config["DEFAULT_ADMIN_PASSWORD"])
+        db.session.add(admin)
+        db.session.commit()
+
+        print(
+            f"Default admin '{admin.email}' created successfully with password from configuration."
+        )
