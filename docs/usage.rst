@@ -16,21 +16,53 @@ Running the Server
 
       pip install -r requirements.txt
 
-3. Initialise the database ::
+   Or use the Makefile helper ::
 
-      flask --app run.py init-db
+      make install
 
-4. Start the development server ::
+3. Set up the database schema using Flask-Migrate. On a brand-new checkout
+   initialise the Alembic environment ::
+
+      flask --app app:create_app db init
+
+   Equivalent Makefile target ::
+
+      make db-init
+
+   Generate and apply the initial migration ::
+
+      flask db migrate -m "initial migration"
+      flask db upgrade
+
+   Or ::
+
+      make db-migrate m="initial migration"
+      make db-upgrade
+
+4. Seed the default administrator account ::
+
+      flask --app app:create_app init-admin
+
+   Or simply ::
+
+      make init-admin
+
+5. Start the development server ::
 
       flask --app run.py run
+
+   Makefile alternative ::
+
+      make run
 
 Authentication & Authorisation
 ------------------------------
 
-To bootstrap the system run ``flask --app run.py init-db``. On first execution
-it creates a default manager account using the credentials supplied via the
-``DEFAULT_ADMIN_EMAIL`` and ``DEFAULT_ADMIN_PASSWORD`` environment variables
-(defaults: ``admin@example.com`` / ``ChangeMe123!``).
+The ``init-admin`` command seeds a default manager account when no users exist.
+Credentials come from ``DEFAULT_ADMIN_EMAIL`` and ``DEFAULT_ADMIN_PASSWORD``
+configuration values (defaults: ``admin@admin.com`` / ``admin``). Adjust these
+environment variables before executing the command if you want a different
+bootstrap user.
 
 Authenticate by submitting Basic credentials to ``POST /auth/login``. The API
 responds with a bearer token:

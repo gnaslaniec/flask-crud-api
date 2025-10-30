@@ -15,13 +15,21 @@ Install dependencies if you have not already ::
 
    pip install -r requirements.txt
 
+Or via the Makefile ::
+
+   make install
+
 Run the full suite ::
 
    pytest
 
-You can also use the convenience target defined in the repository Makefile ::
+Or use the convenience target ::
 
    make test
+
+For coverage information ::
+
+   make test-cov
 
 Fixtures
 --------

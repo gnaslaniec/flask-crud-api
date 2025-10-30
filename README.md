@@ -7,6 +7,7 @@ This repository contains a small but complete Project Management REST API built 
 - CRUD endpoints for users, projects, and nested project tasks
 - JWT-backed authentication with manager-only write permissions
 - SQLAlchemy data models with relationships and cascading deletes
+- Database versioning and migrations via Flask-Migrate (Alembic)
 - Input validation and structured JSON error responses
 - Comprehensive pytest suite with reusable fixtures and factories
 - Sphinx-style docstrings for automatic API documentation extraction
@@ -26,26 +27,90 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### Database Setup
-
-By default the app uses a SQLite database file `project_management.db` in the repository root. Initialise the schema once:
+Or use the bundled Makefile helpers:
 
 ```bash
-flask --app run.py init-db
+make venv
+source .venv/bin/activate
+make install
 ```
 
-You can point to a different database by setting `DATABASE_URL`.
+### Database Setup
+
+By default the app uses a SQLite database file `project_management.db` in the repository root. 
+
+First, initialize the Alembic migration environment (this creates the migrations/ folder):
+
+```bash
+flask --app app:create_app db init
+```
+
+Or via Makefile:
+
+```bash
+make db-init
+```
+
+Then, generate and apply the initial migration to create the database schema:
+
+```bash
+flask db migrate -m "initial migration"
+flask db upgrade
+```
+
+With Makefile equivalents:
+
+```bash
+make db-migrate m="initial migration"
+make db-upgrade
+```
+
+This creates or updates all database tables in sync with your SQLAlchemy models.
+
+If you need to reset or inspect migrations later, use:
+
+```bash
+flask db history
+flask db downgrade
+```
+
+Makefile:
+
+```bash
+make db-downgrade
+```
+
+### Seeding a Default Admin User
+
+After applying migrations, you can create a default manager user via the CLI:
+
+```bash
+flask init-admin
+```
+
+Or simply:
+
+```bash
+make init-admin
+```
 
 If no users exist yet, this command seeds a default manager using the credentials
-configured via `DEFAULT_ADMIN_EMAIL` and `DEFAULT_ADMIN_PASSWORD` (defaults:
-`admin@admin.com` / `admin`). Update those environment variables before
-running the command if you want to set your own secure values. You can then call
-`/auth/login` with those credentials to obtain a token.
+configured via DEFAULT_ADMIN_EMAIL and DEFAULT_ADMIN_PASSWORD (defaults:
+admin@admin.com / admin). Update those environment variables before
+running the command if you want to set your own secure values.
+
+You can then call /auth/login with those credentials to obtain a JWT token.
 
 ### Running the Server
 
 ```bash
 flask --app run.py run
+```
+
+Or:
+
+```bash
+make run
 ```
 
 The API will be available at `http://127.0.0.1:5000/`.
@@ -103,6 +168,18 @@ Refer to in-code docstrings under `app/routes/` for detailed parameter and respo
 pytest
 ```
 
+Or:
+
+```bash
+make test
+```
+
+Coverage run:
+
+```bash
+make test-cov
+```
+
 The tests use an in-memory SQLite database and cover CRUD happy paths, authorisation failures, and validation edge cases.
 
 ## Documentation
@@ -114,8 +191,18 @@ pip install -r requirements.txt  # if not already installed
 sphinx-build -b html docs docs/_build/html
 ```
 
+Or streamline with:
+
+```bash
+make docs
+```
+
 Open `docs/_build/html/index.html` in your browser to explore the rendered docs.
 
-## Postman Collection (Optional)
+## Postman Collection
 
 A Postman collection (`docs/postman_collection.json`) is included for quickly exercising the API endpoints in a collaborative environment.
+
+## Design Rationale
+
+For deeper architectural context, see [`DESIGN_RATIONALE.md`](DESIGN_RATIONALE.md).
