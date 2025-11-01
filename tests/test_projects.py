@@ -62,11 +62,13 @@ def test_delete_project_removes_tasks(client, manager_headers, employee_headers)
         f"/projects/{project['id']}", headers=manager_headers
     )
     assert delete_response.status_code == 200
+    assert delete_response.get_json()["message"] == "Project deleted."
 
     tasks_response = client.get(
         f"/projects/{project['id']}/tasks", headers=employee_headers
     )
     assert tasks_response.status_code == 404
+    assert tasks_response.get_json()["error"] == "not_found"
 
     with client.application.app_context():
         assert Task.query.filter_by(project_id=project["id"]).count() == 0
@@ -80,5 +82,51 @@ def test_list_projects(client, manager_headers, employee_headers):
 
     response = client.get("/projects", headers=employee_headers)
     assert response.status_code == 200
-    names = [project["name"] for project in response.get_json()["data"]]
+    payload = response.get_json()
+    names = [project["name"] for project in payload["data"]]
     assert "Project A" in names and "Project B" in names
+    meta = payload["meta"]
+    assert meta["page"] == 1
+    assert meta["per_page"] >= 2
+    assert meta["total"] >= 2
+
+
+def test_update_project_rejects_immutable_fields(client, manager_headers):
+    """Updating immutable fields returns a business validation error."""
+
+    project = create_project(client, manager_headers)
+    response = client.put(
+        f"/projects/{project['id']}",
+        data=json.dumps({"created_by": 999}),
+        headers=manager_headers,
+    )
+    assert response.status_code == 422
+    body = response.get_json()
+    assert body["error"] == "business_validation_error"
+
+
+def test_list_projects_rejects_oversized_page_size(
+    client, manager_headers, employee_headers
+):
+    """per_page parameter greater than configured maximum is rejected."""
+
+    for i in range(5):
+        create_project(client, manager_headers, name=f"Proj {i}")
+
+    max_per_page = client.application.config["PAGINATION_MAX_PAGE_SIZE"]
+    response = client.get(
+        f"/projects?per_page={max_per_page + 1}", headers=employee_headers
+    )
+    assert response.status_code == 422
+    body = response.get_json()
+    assert body["error"] == "business_validation_error"
+    assert str(max_per_page) in body["message"]
+
+
+def test_list_projects_rejects_invalid_page(client, manager_headers, employee_headers):
+    """Invalid pagination parameters raise a business validation error."""
+
+    create_project(client, manager_headers)
+    response = client.get("/projects?page=0", headers=employee_headers)
+    assert response.status_code == 422
+    assert response.get_json()["error"] == "business_validation_error"

@@ -2,35 +2,41 @@
 
 from __future__ import annotations
 
-from flask import Response, jsonify, request
+from flask import Response, current_app, request
 
-from ..auth import generate_access_token
-from ..models import User
+from ..extensions import limiter
+from ..errors import ForbiddenError
+from ..services import authenticate_user_and_issue_token
 from . import api_bp
 from .common import json_response
 
 
-@api_bp.route("/auth/login", methods=["POST"])
+def _is_origin_allowed() -> bool:
+    """Check whether the request Origin header is in the allowed CORS list."""
+
+    origin = request.headers.get("Origin")
+    if not origin:
+        return True
+
+    allowed = current_app.config.get("CORS_ALLOWED_ORIGINS") or ()
+    if "*" in allowed:
+        return True
+    return origin in allowed
+
+
+@api_bp.route("/auth/login", methods=["POST", "OPTIONS"])
+@limiter.limit(lambda: current_app.config["LOGIN_RATE_LIMIT"], methods=["POST"])
 def login() -> Response:
     """Authenticate a user via HTTP Basic auth and issue a JWT."""
 
-    auth = request.authorization
-    if not auth or not auth.username or not auth.password:
-        return (
-            jsonify({"error": "unauthorized", "message": "Credentials required."}),
-            401,
-            {"WWW-Authenticate": 'Basic realm="Login Required"'},
-        )
+    if not _is_origin_allowed():
+        raise ForbiddenError("Origin not allowed.")
 
-    user = User.query.filter_by(email=auth.username).first()
-    if user is None or not user.check_password(auth.password):
-        return (
-            jsonify({"error": "unauthorized", "message": "Invalid email or password."}),
-            401,
-            {"WWW-Authenticate": 'Basic realm="Login Required"'},
-        )
+    if request.method == "OPTIONS":
+        response = current_app.make_default_options_response()
+        return response
 
-    token = generate_access_token(user)
+    token = authenticate_user_and_issue_token()
     return json_response({"access_token": token, "token_type": "Bearer"})
 
 

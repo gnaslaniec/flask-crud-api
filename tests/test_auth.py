@@ -44,6 +44,21 @@ def test_login_rejects_invalid_credentials(client):
     assert response.get_json()["error"] == "unauthorized"
 
 
+def test_login_is_rate_limited(client):
+    """Excessive login attempts are throttled."""
+
+    basic_token = b64encode("unknown@example.com:wrong".encode()).decode()
+    headers = {"Authorization": f"Basic {basic_token}"}
+
+    for _ in range(3):
+        response = client.post("/auth/login", headers=headers)
+        assert response.status_code == 401
+
+    limited = client.post("/auth/login", headers=headers)
+    assert limited.status_code == 429
+    assert limited.get_json()["error"] == "rate_limit_exceeded"
+
+
 def test_init_admin_creates_default_admin(app):
     """init-admin seeds a default manager when no users exist."""
 
