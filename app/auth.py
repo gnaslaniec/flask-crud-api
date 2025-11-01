@@ -4,16 +4,17 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from functools import wraps
-from typing import Callable, Optional, Tuple, TypeVar, TypedDict, cast
+from typing import Callable, TypeVar, TypedDict, cast
 
 import jwt
-from flask import Response, current_app, g, jsonify, request
+from flask import current_app, g, request
 from jwt import ExpiredSignatureError, InvalidTokenError
 
+from .errors import ForbiddenError, UnauthorizedError
 from .extensions import db
 from .models import User
 
-F = TypeVar("F", bound=Callable[..., Response])
+F = TypeVar("F", bound=Callable[..., object])
 MISSING_TOKEN_MSG = "Missing or invalid bearer token."
 
 
@@ -26,29 +27,10 @@ class JWTClaims(TypedDict):
     exp: int
 
 
-def _unauthorized(message: str) -> Response:
-    """Return a standardised 401 response."""
-
-    return jsonify({"error": "unauthorized", "message": message}), 401
-
-
-def _forbidden(message: str) -> Response:
-    """Return a standardised 403 response."""
-
-    return jsonify({"error": "forbidden", "message": message}), 403
-
-
 def _clear_current_user() -> None:
     """Remove any previously stored user from the request context."""
 
     g.pop("current_user", None)
-
-
-def _auth_failure(message: str) -> Tuple[None, Response]:
-    """Return an auth failure response while clearing context."""
-
-    _clear_current_user()
-    return None, _unauthorized(message)
 
 
 def _get_jwt_algorithm() -> str:
@@ -83,34 +65,39 @@ def decode_access_token(token: str) -> JWTClaims:
     return cast(JWTClaims, decoded)
 
 
-def _authenticate_request() -> Tuple[Optional[User], Optional[Response]]:
+def _authenticate_request(require_manager: bool = False) -> User:
     """Validate the bearer token on the current request."""
+
+    _clear_current_user()
 
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.lower().startswith("bearer "):
-        return _auth_failure(MISSING_TOKEN_MSG)
+        raise UnauthorizedError(MISSING_TOKEN_MSG)
 
     token = auth_header.split(None, 1)[1].strip()
     if not token:
-        return _auth_failure(MISSING_TOKEN_MSG)
+        raise UnauthorizedError(MISSING_TOKEN_MSG)
 
     try:
         payload = decode_access_token(token)
-    except ExpiredSignatureError:
-        return _auth_failure("Authentication token has expired.")
-    except InvalidTokenError:
-        return _auth_failure("Invalid authentication token.")
+    except ExpiredSignatureError as exc:  # pragma: no cover - relies on timing
+        raise UnauthorizedError("Authentication token has expired.") from exc
+    except InvalidTokenError as exc:
+        raise UnauthorizedError("Invalid authentication token.") from exc
 
     user_id = payload.get("sub")
     if user_id is None:
-        return _auth_failure("Invalid authentication token.")
+        raise UnauthorizedError("Invalid authentication token.")
 
     user = db.session.get(User, int(user_id))
     if user is None:
-        return _auth_failure("User referenced by token no longer exists.")
+        raise UnauthorizedError("User referenced by token no longer exists.")
+
+    if require_manager and user.role != "manager":
+        raise ForbiddenError("Manager role required for this operation.")
 
     g.current_user = user
-    return user, None
+    return user
 
 
 def require_auth(func: F) -> F:
@@ -118,9 +105,7 @@ def require_auth(func: F) -> F:
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-        _, error = _authenticate_request()
-        if error:
-            return error
+        _authenticate_request(require_manager=False)
         return func(*args, **kwargs)
 
     return wrapper  # type: ignore[return-value]
@@ -131,13 +116,15 @@ def require_manager(func: F) -> F:
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-        user, error = _authenticate_request()
-        if error:
-            return error
-
-        if user.role != "manager":
-            return _forbidden("Manager role required for this operation.")
-
+        _authenticate_request(require_manager=True)
         return func(*args, **kwargs)
 
     return wrapper  # type: ignore[return-value]
+
+
+__all__ = [
+    "decode_access_token",
+    "generate_access_token",
+    "require_auth",
+    "require_manager",
+]
