@@ -5,7 +5,10 @@ Flask Project Management API
 
 Welcome to the developer documentation for the Project Management API. This site
 describes the overall system, how to run it locally, and provides detailed API
-references generated directly from the source code.
+references generated directly from the source code. The current release focuses
+on production hardening through rate limiting, CORS, repository-driven data
+access, strengthened validation, a bundled HTMX frontend, and automatic environment
+loading from `.env` via ``python-dotenv``.
 
 Contents
 --------

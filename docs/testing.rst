@@ -4,9 +4,9 @@ Testing
 Overview
 --------
 
-Unit tests are written with ``pytest`` and cover all major business rules,
-including role enforcement and relational behaviour between projects and tasks.
-Tests execute against an in-memory SQLite database for fast, isolated runs.
+Unit tests are written with ``pytest`` and cover API flows, repository CRUD
+behaviour, rate limiting, pagination, and other business rules. Tests execute
+against an in-memory SQLite database for fast, isolated runs.
 
 Running Tests
 -------------
@@ -19,7 +19,7 @@ Or via the Makefile ::
 
    make install
 
-Run the full suite ::
+Run the full suite (repositories and services are included in coverage) ::
 
    pytest
 

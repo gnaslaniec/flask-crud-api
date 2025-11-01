@@ -5,14 +5,18 @@ Quick Overview
 --------------
 
 The Project Management API is a Flask application that exposes CRUD endpoints
-for users, projects, and tasks. Write operations require a manager-authenticated
-JSON Web Token (JWT), while read operations are open to all roles.
+for users, projects, and tasks. Recent iterations introduced a repository +
+service architecture, rate limiting, pagination metadata, CORS enforcement, and
+password complexity requirements. Write operations require a manager-
+authenticated JSON Web Token (JWT), while read operations are open to all
+roles.
 
 Running the Server
 ------------------
 
 1. Create and activate a virtual environment.
-2. Install dependencies ::
+2. Install dependencies (runtime now includes "Flask-Limiter" and
+   "Flask-Cors") ::
 
       pip install -r requirements.txt
 
@@ -39,7 +43,10 @@ Running the Server
       make db-migrate m="initial migration"
       make db-upgrade
 
-4. Seed the default administrator account ::
+4. Copy ``.env.example`` to ``.env`` and customise as needed. The application
+   automatically loads this file through ``python-dotenv`` on startup.
+
+5. Seed the default administrator account ::
 
       flask --app app:create_app init-admin
 
@@ -47,13 +54,32 @@ Running the Server
 
       make init-admin
 
-5. Start the development server ::
+6. Start the development server ::
 
       flask --app run.py run
 
    Makefile alternative ::
 
       make run
+
+Running the Frontend
+--------------------
+
+The repository bundles a static HTMX-powered frontend inside the ``frontend/``
+directory. Serve it with your favourite static file server; Python's standard
+library works well for a quick local setup ::
+
+   python -m http.server 3000 --directory frontend
+
+If you prefer the Makefile helper ::
+
+   make frontend [FRONTEND_PORT=3000]
+
+When the page loads it calls the API at ``http://localhost:5000``. To point the
+UI to another deployment, set ``pm_api_base`` in your browser console and
+refresh ::
+
+   localStorage.setItem('pm_api_base', 'http://localhost:8000');
 
 Authentication & Authorisation
 ------------------------------
@@ -64,8 +90,9 @@ configuration values (defaults: ``admin@admin.com`` / ``admin``). Adjust these
 environment variables before executing the command if you want a different
 bootstrap user.
 
-Authenticate by submitting Basic credentials to ``POST /auth/login``. The API
-responds with a bearer token:
+Authenticate by submitting Basic credentials to ``POST /auth/login``. This
+endpoint is rate limited (default: ``5 per minute``). The API responds with a
+bearer token:
 
 .. code-block:: bash
 
@@ -80,8 +107,8 @@ Use the returned ``access_token`` when calling protected endpoints:
 All endpoints require a bearer token. Authenticated users of any role can
 perform read-only requests, while only users with the ``manager`` role can
 perform create, update, or delete operations. When creating or updating users
-you must supply a ``password`` field which is stored as a secure hash and never
-returned in responses.
+you must supply a ``password`` field which must pass the configured complexity
+regex and is stored as a secure hash that is never returned in responses.
 
 Key Endpoints
 -------------
@@ -90,7 +117,7 @@ Users
 ~~~~~
 
 ``POST /users`` – Create a new user (manager only)
-``GET /users`` – List all users
+``GET /users`` – List all users (paginated)
 ``GET /users/<id>`` – Fetch a user
 ``PUT /users/<id>`` – Update user details (manager only)
 ``DELETE /users/<id>`` – Delete a user (manager only)
@@ -99,7 +126,7 @@ Projects
 ~~~~~~~~
 
 ``POST /projects`` – Create a new project (manager only)
-``GET /projects`` – List all projects
+``GET /projects`` – List all projects (paginated)
 ``GET /projects/<id>`` – Fetch a project
 ``PUT /projects/<id>`` – Update a project (manager only)
 ``DELETE /projects/<id>`` – Delete a project (manager only)
@@ -111,8 +138,28 @@ Tasks
 ~~~~~
 
 ``POST /projects/<id>/tasks`` – Create a task within a project (manager only)
-``GET /projects/<id>/tasks`` – List tasks for a project
+``GET /projects/<id>/tasks`` – List tasks for a project (paginated)
 ``PUT /projects/<id>/tasks/<task_id>`` – Update a task (manager only)
 
 Marshmallow validation ensures required fields are supplied and values fall
-within expected ranges.
+within expected ranges. Pagination responses include a ``meta`` object with
+``page``, ``per_page``, ``total``, and navigation hints.
+
+Pagination Parameters
+---------------------
+
+All list endpoints accept ``page`` and ``per_page`` query arguments. Values
+larger than ``PAGINATION_MAX_PAGE_SIZE`` raise a business validation error. The
+defaults can be configured via environment variables.
+
+When overriding ``PASSWORD_COMPLEXITY_REGEX`` in ``.env`` make sure to use
+single backslashes (``\``) in escape sequences, e.g. ``\d`` and ``\W``. Double
+escaping would cause the pattern to match literal characters instead of the
+expected character classes.
+
+CORS
+----
+
+Cross-Origin Resource Sharing is enforced with ``Flask-Cors``. Only origins in
+``CORS_ALLOWED_ORIGINS`` may call the API. The default allow list is
+``http://localhost:3000`` for local development.
