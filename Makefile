@@ -50,7 +50,7 @@ docs-clean:
 	rm -rf $(DOCSBUILD)
 
 seed:
-	$(PYTHON) scripts/seed_data.py --users $(or $(users),5) --projects $(or $(projects),5)
+	$(FLASK) --app $(FLASK_APP) seed-data --users $(or $(users),5) --projects $(or $(projects),5) $(if $(password),--password "$(password)",)
 
 frontend:
 	$(PYTHON) -m http.server $(FRONTEND_PORT) --directory $(FRONTEND_DIR)

@@ -90,6 +90,22 @@ configuration values (defaults: ``admin@admin.com`` / ``admin``). Adjust these
 environment variables before executing the command if you want a different
 bootstrap user.
 
+Seeding Demo Data
+-----------------
+
+Load deterministic demo users and projects with the ``seed-data`` command. For
+example, to create 10 users and 10 projects while assigning a custom password ::
+
+   flask --app app:create_app seed-data --users 10 --projects 10 --password "Temp123!"
+
+An equivalent Makefile helper accepts the same overrides ::
+
+   make seed users=10 projects=10 password=Temp123!
+
+Omit options to fall back to the defaults (5 users, 5 projects, password
+``ChangeMe123!``). The command is idempotent: rerunning the seed only adds new
+records when unique emails or project names are available.
+
 Authenticate by submitting Basic credentials to ``POST /auth/login``. This
 endpoint is rate limited (default: ``5 per minute``). The API responds with a
 bearer token:

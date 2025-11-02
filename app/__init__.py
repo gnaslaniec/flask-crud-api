@@ -5,9 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, Optional, Type
 
+import click
+from dotenv import load_dotenv
 from flask import Flask
 from flask.cli import with_appcontext
-from dotenv import load_dotenv
 
 from .config import Config
 from .errors import register_error_handlers
@@ -124,4 +125,42 @@ def register_cli(app: Flask) -> None:
 
         print(
             f"Default admin '{admin.email}' created successfully with password from configuration."
+        )
+
+    @app.cli.command("seed-data")
+    @click.option(
+        "--users",
+        type=int,
+        default=5,
+        show_default=True,
+        help="Number of demo users to create.",
+    )
+    @click.option(
+        "--projects",
+        type=int,
+        default=5,
+        show_default=True,
+        help="Number of demo projects to create.",
+    )
+    @click.option(
+        "--password",
+        default="ChangeMe123!",
+        show_default=True,
+        help="Password assigned to newly created users.",
+    )
+    @with_appcontext
+    def seed_data(users: int, projects: int, password: str) -> None:  # pragma: no cover - CLI utility
+        """Load predictable demo data for local development."""
+
+        from scripts.seed_data import seed_database
+
+        db.create_all()
+        created_users, created_projects = seed_database(
+            num_users=users,
+            num_projects=projects,
+            default_password=password,
+        )
+        print(
+            f"Seeded {created_users} users and {created_projects} projects "
+            f"(requested {users} users, {projects} projects)."
         )

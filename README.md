@@ -127,6 +127,23 @@ running the command if you want to set your own secure values.
 
 You can then call /auth/login with those credentials to obtain a JWT token.
 
+### Seeding Sample Data
+
+Populate the database with predictable demo users and projects:
+
+```bash
+flask --app app:create_app seed-data --users 10 --projects 10 --password "Temp123!"
+```
+
+Or via the Makefile helper:
+
+```bash
+make seed users=10 projects=10 password=Temp123!
+```
+
+Omit any option to use the defaults (`5` users, `5` projects, password `ChangeMe123!`). 
+The command is idempotent: it skips users and projects that already exist, so rerunning it adds only new records with incremented identifiers.
+
 ### Running the Server
 
 ```bash
